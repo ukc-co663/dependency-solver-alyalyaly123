@@ -90,10 +90,10 @@ public class Main {
 	
   public static void main(String[] args) throws IOException {
     TypeReference<List<Package>> repoType = new TypeReference<List<Package>>() {};
-    List<Package> repo = JSON.parseObject(readFile("seen-2/repository.json"), repoType);
+    List<Package> repo = JSON.parseObject(readFile(readFile(args[0])), repoType);
     TypeReference<List<String>> strListType = new TypeReference<List<String>>() {};
-    List<String> initial = JSON.parseObject(readFile("seen-0/initial.json"), strListType);
-    List<String> constraints = JSON.parseObject(readFile("seen-2/constraints.json"), strListType);
+    List<String> initial = JSON.parseObject(readFile(readFile(args[1])), strListType);
+    List<String> constraints = JSON.parseObject(readFile(args[2])), strListType);
     
     //CHANGE CODE BELOW:
     // using repo, initial and constraints, compute a solution and print the answer
