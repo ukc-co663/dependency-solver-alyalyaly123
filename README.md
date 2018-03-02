@@ -1,4 +1,2 @@
-# dependency-solver-Aly 
-
-
-dependency-solver-alyalyaly123 created by GitHub Classroom
+# depsolver-StartJava
+Scaffolding for Java projects
