@@ -102,7 +102,11 @@ public class Main
     	}
     	
     }
-	System.out.println(commands.toString());
+	   
+	commands.addAll(initial);
+      Collections.reverse(commands);
+      
+	System.out.println(JSON.toJSONString(commands));
 	
     
   }
