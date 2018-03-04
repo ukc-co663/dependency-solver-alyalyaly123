@@ -103,7 +103,24 @@ public class Main
     	
     }
 	   
-	commands.addAll(initial);
+	   
+	    if(initial.size() >0){
+      for(String x: constraints){
+    	  
+      	String symbol=""+ x.charAt(0);
+      	String tempConstraint= x.substring(1);
+     
+     
+      	
+         	ArrayList<String> cons= splitString(tempConstraint);
+      	String nameCons= cons.get(0);
+      	String versionCons= cons.get(1);
+    	  
+    	  ArrayList<String> initialChecker= checkInitial(repo,cons,initial,constraints);
+    	  commands.addAll(initialChecker);
+      }
+	   
+	
       Collections.reverse(commands);
       
 	System.out.println(JSON.toJSONString(commands));
@@ -125,9 +142,13 @@ public class Main
 		   
 		   if( stateValid(commandsChecker ,  repo )){
 			 
+			    if(initialS.charAt(0)=='-'){
+				 newCommand.add(initialS);
+			 }else{
 			   
 			  String  newString= "-" + initialS;
 			  newCommand.add(newString);
+			 }
 			  
 	   }
 	   
