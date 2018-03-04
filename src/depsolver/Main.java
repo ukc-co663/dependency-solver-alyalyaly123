@@ -61,8 +61,10 @@ public float versionTotalInt(){
 public class Main 
 
 {
+	public ArrayList<String> stateCommands;
 	public static String nameCons;
 	public ArrayList<String> conflicts;
+	public static boolean conflictTest;
 	
    public static void main(String[] args) throws IOException {
     TypeReference<List<Package>> repoType = new TypeReference<List<Package>>() {};
@@ -76,7 +78,6 @@ public class Main
      
     //Construct command list
 
-   
       for(String s : constraints){
     	
  
@@ -89,6 +90,7 @@ public class Main
        	ArrayList<String> cons= splitString(tempConstraint);
     	String nameCons= cons.get(0);
     	String versionCons= cons.get(1);
+    	
 
      	ArrayList<String> initialChecker= checkInitial(repo,cons,initial,constraints);
     	
@@ -97,14 +99,18 @@ public class Main
     	
   	  ArrayList<String> conflicts= new ArrayList<String>();
   	  ArrayList<String> state= new ArrayList<String>();
+  	  HashSet<String> dontAddList = new HashSet<String>();
+  	  
     	if(symbol.equals("+")){
-    	commands.addAll(dependancyBuilder(repo , cons, state));
+    		conflictTest=false;
+    	commands.addAll(dependancyBuilder(repo , cons, state,dontAddList,true));
+    	}
+    	else if(symbol.equals("-")){
+    		commands.add(s);
     	}
     	
     }
-	   
-	   
-	    if(initial.size() >0){
+      if(initial.size() >0){
       for(String x: constraints){
     	  
       	String symbol=""+ x.charAt(0);
@@ -119,8 +125,9 @@ public class Main
     	  ArrayList<String> initialChecker= checkInitial(repo,cons,initial,constraints);
     	  commands.addAll(initialChecker);
       }
+      }
 	   
-	
+	//commands.addAll(initialChecker);
       Collections.reverse(commands);
       
 	System.out.println(JSON.toJSONString(commands));
@@ -135,21 +142,22 @@ public class Main
 		   ArrayList<String> emptyState = new ArrayList<String>();
 		   return emptyState;
 	   }
+	   HashSet<String> emptyHash = new HashSet<String>();
 	   ArrayList<String> emptyState = new ArrayList<String>();
 	   ArrayList<String> newCommand = new ArrayList<String>();
-	   ArrayList<String> commandsChecker= dependancyBuilder(repo, cons,emptyState);
+	   ArrayList<String> commandsChecker= dependancyBuilder(repo, cons,emptyState,emptyHash,true);
 	   for(String initialS : initial){
+		   ArrayList<String> initialAdd = new ArrayList<String>();
+		   initialAdd.add(initialS);
 		   
-		   if( stateValid(commandsChecker ,  repo )){
-			 
-			    if(initialS.charAt(0)=='-'){
+		   if(stateValid(commandsChecker ,initialAdd  ,repo )){
+			 if(initialS.charAt(0)=='-'){
 				 newCommand.add(initialS);
 			 }else{
 			   
 			  String  newString= "-" + initialS;
 			  newCommand.add(newString);
 			 }
-			  
 	   }
 	   
    }
@@ -162,7 +170,6 @@ public class Main
   
    
   public static boolean versionCompare(String vers1, String vers2, String symbol){
-	  
 	  
 	  
 	  if(symbol.equals("=")){
@@ -216,14 +223,15 @@ public class Main
 	
   
   
-  
-  public static ArrayList<String> dependancyBuilder (List<Package> repo, List<String> item,ArrayList<String> states){
+  //Builds dependancies
+  public static ArrayList<String> dependancyBuilder (List<Package> repo, List<String> item,ArrayList<String> states, HashSet<String> dontAdd, boolean cont){
 	  ArrayList<String> originalState= new ArrayList<String>(states);
-	
+		ArrayList<String> empty = new ArrayList<String>();
+
 	  ArrayList<String> packageList = new ArrayList<String>();
 	  		
 	  		ArrayList<String> cons= splitString(item.toString());
-			
+
 	    	String nameCons= cons.get(0);
 	    	String versionCons= cons.get(1); 
 	    	String symbol;
@@ -232,124 +240,70 @@ public class Main
 	       	
 	    	if(versionCons.equals("Any")){
 	    		symbol= "Any";
-	    		String[] c= nameCons.split("");
-	    		nameCons= c[1];
+	    		String[] c= nameCons.split(",");
+	    		nameCons= c[0];
 	    	}
 	    	else{
 	    		
 	    		symbol= cons.get(2);
 	    	}
 	    	
-	    	
 	    	//Start process
 	    
 	    	for(Package p : repo){
 	    		
-
 	    		if((p.getName().equals(nameCons)&&versionCompare(p.getVersion(),versionCons,symbol))){
-	    	
-	    		
 	    			
-	    			
-	    			
-	    			ArrayList<String> stateTest= new ArrayList<String>(states);
+	    			ArrayList<String> stateTest= new ArrayList<String>(originalState);
 	    			stateTest.add("+"+p.getName()+"="+p.getVersion());
-	    			
+	    			ArrayList<String> addTest = new ArrayList<String>();
+	    			addTest.add("+"+p.getName()+"="+p.getVersion());
 	    			  Set<String> dupeTest= new HashSet<String>(stateTest);
+	    			  
 	    	    	  if(dupeTest.size()< stateTest.size()){
-	    	    		  ArrayList<String> emptyReturned= new ArrayList<String>();
-	    	    		  return emptyReturned;
+	    	    		  conflictTest=true;
+	    	    		  return empty;
 	    	    	  }
 	    			
 	    			
-    				if(stateValid(stateTest,repo)){
+    				if(stateValid(stateTest,addTest,repo)){
 		    			packageList.add("+"+p.getName()+"="+p.getVersion());
 		    			states.add("+"+p.getName()+"="+p.getVersion());
-    				}else{
+    				
     					
-    				}
-		    			
-		    			
-		    			
+    				
+		    			//Size is 0, should just return what it has
 		    			if(p.getDepends().size()==0){
-			    			return packageList;
+		    				cont=false;
+		    				conflictTest=false;
+			    			return states;
 		    			}
 		    			
-		    			else if(p.getDepends().size()==1){
-    					if(p.getDepends().get(0).size()==1) {
-    					ArrayList<String> added= new ArrayList<String>(dependancyBuilder(repo,p.getDepends().get(0),states));
-						 ArrayList<String> stateTemp = new ArrayList<String>(states);
-						 stateTemp.addAll(added);
-					
-						 
-						if(stateValid(stateTemp,repo )){
-							if(states.containsAll(added)){
-								ArrayList<String> empty = new ArrayList<String>();
-								return empty;
-							}else{
-								
-								packageList.addAll(added);
-								states.addAll(added);
-								return packageList; 
-								}
-						}
-						else{
-							ArrayList<String> empty = new ArrayList<String>();
-							return empty;
-						}
-    				}
-    					else if(p.getDepends().get(0).size()>1) {
-    						for(String str: p.getDepends().get(0)) {
-    							ArrayList<String> dependAdded =new ArrayList<String>();
-    							dependAdded.add(str);
-	    						ArrayList<String> added= new ArrayList<String>(dependancyBuilder(repo,dependAdded, states));
-	    						 ArrayList<String> stateTemp = new ArrayList<String>(states);
-	    						 stateTemp.addAll(added);
-	    						 if(stateValid(stateTemp,repo)){
-		    							if(originalState.containsAll(added)){
-	    									ArrayList<String> empty = new ArrayList<String>();
-	    									return empty;
-	    								}else
-	    								{
-			    					    packageList.addAll(added);
-			    					    states.addAll(packageList);
-			    					    return packageList;
-			    					    
-			    					    }
-			    					 
-		    						}
-		    						else{
-		    					    }
-	    						
-    						}
-    					}
-    					
-    				}
-    				
-    				
-    					//For If multiple on list
+		    		
+		    			
+		    			
+		    			//Dependancy checking
+		    			if(p.getDepends().size()>=1){
 	    			
 	    				for(List<String> dependancyList: p.getDepends()){
 	    					
-	    					
 	    					if(dependancyList.size()==1){
 	    						
-	    						
-	    						
-	    						ArrayList<String> added= new ArrayList<String>(dependancyBuilder(repo,dependancyList,states));
+	    						ArrayList<String> added= new ArrayList<String>(dependancyBuilder(repo,dependancyList,states,dontAdd,true));
 	    						 ArrayList<String> stateTemp = new ArrayList<String>(states);
 	    						 stateTemp.addAll(added);
 	    						 
-	    						 
-	    						if(stateValid(stateTemp,repo )){
-	    								if(stateTemp.contains(added)){
-	    									ArrayList<String> empty = new ArrayList<String>();
-	    									return empty;
-	    								}else{
+	    						if((stateValid(stateTemp,added,repo))){
+	    								
 		    						packageList.addAll(added);
 		    						states.addAll(added);
+		    						conflictTest=false;
 		    						
-		    						}
+		    						
+	    						}
+	    						else{
+	    							dontAdd.addAll(added);
+	    							conflictTest=true;
 	    						}
 
 	    						
@@ -358,10 +312,15 @@ public class Main
 	    					
 	    				
 	    				for(List<String> depends: p.getDepends()){
+	    					boolean contin= true;
 
 	    					if(depends.size()>1){
 	    					for(String z: depends){
-	    						
+	    						if(contin==true){
+	    							if(dontAdd.contains(z)){
+	    								
+	    							}
+	    							else{
 	    						//IN THIS AREA, CREATE A THING THAT COMPARES CONFLICTS AND ADDS IF THE FINAL STATE IS VALID
 	    						//EASIER SAID THAN DONE BUT YOU KNOW
 	    						
@@ -370,45 +329,67 @@ public class Main
 	    						
 	    						
 	    					    
-	    						ArrayList<String> added= new ArrayList<String>(dependancyBuilder(repo,x, states));
+	    						ArrayList<String> added= new ArrayList<String>(dependancyBuilder(repo,x, states,dontAdd,true));
 	    						ArrayList<String> stateForThing=new ArrayList<String>(states);
 	    						stateForThing.addAll(added);
-	
-	    						if(stateValid(stateForThing,repo)){
-	    							if(originalState.containsAll(added)){
-    									ArrayList<String> empty = new ArrayList<String>();
-    								}
-	    							else{
+
+	    						if((stateValid(stateForThing,added,repo))){
+	    							if(dontAdd.contains(added)){
+	    							}
+	    							
 	    								
 		    					    packageList.addAll(added);
 		    					    states.addAll(packageList);
-		    					    return packageList;
+		    					    contin=false;
 		    					    
-		    					    }
 		    					 
 	    						}
 	    						else{
+	    							dontAdd.addAll(added);
+	    							conflictTest=true;
+	    							
+	    							
 	    					    }
     						
-
-	    					}
+	    						}
+	    					}}
 	    					}
 	
 	    					
 
 	    			}
-
-	    			
+		    			}
+		    			
+    				}
+    				else{
+    					dontAdd.addAll(addTest);
+    					return empty;
+    				}
+    				
 	    			}
-	    		
+
 	    		
 	    	}
+	    	
+	    	if(stateValid(states,packageList,repo)){
 			return states;
+			}
+	    	else{
+	    		ArrayList<String> empt= new ArrayList<String>();
+	    		return empt;
+	    	}
 	  
 	    	}
   
-  
-  
+  		
+      public void stateChange(ArrayList<String> commands){
+    	  
+    	  for(String stri: commands){
+    		  
+    		  stateCommands.add(stri.substring(1));
+    		  
+    	  }
+      }
   
   
 	   public static ArrayList<String> conflictBuilder (List<Package> repo, ArrayList<String> state){
@@ -445,11 +426,16 @@ public class Main
   
   
 //Work on removing conflicting details
-  public static boolean stateValid(ArrayList<String> state , List<Package> repo ){
-	 
+  public static boolean stateValid(ArrayList<String> state ,ArrayList<String> added, List<Package> repo ){
+	  if(added.isEmpty()){
+		 return false;
+		 
+		
+	 }
+	  
+
 	  Set<String> dupeTest= new HashSet<String>(state);
 	  if(dupeTest.size()< state.size()){
-		  
 		  return false;
 	  }
 	  
@@ -490,6 +476,9 @@ public class Main
 	    		} 
 		 }
 	  	}
+	  
+  	  for(Package pack: statePackList){
+
 	  for(String confl: conflicts){
 		  ArrayList<String> stateAsArray= splitString(confl);
 	    	String nameCons= stateAsArray.get(0);
@@ -504,21 +493,54 @@ public class Main
 	    		
 	    		symbol= stateAsArray.get(2);
 	    	}
-	  	  for(Package pack: statePackList){
+	    	
 
 
-	    	if( (pack.getName().equals(nameCons) && versionCons.equals("Any"))||
-	    	   (pack.getName().equals(nameCons) && versionCompare(pack.getVersion(),versionCons,symbol)))
+	    	if(pack.getName().equals(nameCons) && versionCompare(pack.getVersion(),versionCons,symbol))
 	    	{
 			    	return false;
-		    		}
+	
+	    	}
 		
 			
 			  }
+	  alreadyAdded.add(pack);
 		  
 	  }
-	  
-	  
+
+	 /* for(Package pa: alreadyAdded){
+	  }*/
+	  List<List<String>> dep = statePackList.get(alreadyAdded.size()-1).getDepends();
+	  for(List<String> d : dep){
+		  if(d.size()==1){
+			  for(String sc: d){
+			  ArrayList<String> stateAsArray= splitString(sc);
+		    	String nameCons= stateAsArray.get(0);
+		    	String versionCons= stateAsArray.get(1); 
+		    	String symbol;
+		    	
+		    	if(versionCons.equals("Any")){
+		    		symbol= "Any";
+		    	
+		    	}
+		    	else{
+		    		
+		    		symbol= stateAsArray.get(2);
+		    	}
+		    	
+			  
+			  for(Package x: statePackList){
+				  if(x.getName().equals(nameCons) && versionCompare(x.getVersion(),versionCons,symbol)){
+					  return false;
+				  }
+				 
+			  }
+			  }
+			  
+		  }
+	  }
+	 
+
 	return true;
 	  
 	  
@@ -596,6 +618,9 @@ public class Main
 			 return returned;
 	  }
 	  else{
+		  input= input.replace("[", "");
+		  input= input.replace("]", "");
+	
 		  returned.add(input);
 		  returned.add("Any");
 		  return returned;
